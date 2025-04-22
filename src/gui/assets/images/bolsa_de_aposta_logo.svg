@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="50" viewBox="0 0 150 50">
+  <style>
+    .logo-text { fill: white; font-family: Arial, sans-serif; font-weight: bold; }
+    .logo-bg { fill: #222222; }
+    .logo-icon { fill: white; }
+  </style>
+  <rect class="logo-bg" width="150" height="50" rx="5" />
+  <path class="logo-icon" d="M30,10 L40,10 L35,20 L45,20 L35,40 L25,25 L35,25 Z" />
+  <text class="logo-text" x="55" y="25" font-size="16">BOLSA</text>
+  <text class="logo-text" x="55" y="40" font-size="16">DE APOSTA</text>
+</svg>
