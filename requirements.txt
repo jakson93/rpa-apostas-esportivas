@@ -1,0 +1,21 @@
+# Dependências para o módulo Telegram
+python-telegram-bot>=13.0
+telethon>=1.24.0
+
+# Dependências para a interface gráfica
+PyQt5>=5.15.0
+PyQt5-sip>=12.8.0
+
+# Dependências para o banco de dados (Supabase)
+supabase>=0.7.1
+postgrest>=0.10.6
+
+# Dependências para automação do navegador
+selenium>=4.1.0
+webdriver-manager>=3.8.0
+playwright>=1.20.0
+
+# Utilitários
+python-dotenv>=0.19.0
+loguru>=0.6.0
+pydantic>=1.9.0
