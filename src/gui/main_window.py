@@ -13,6 +13,9 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
+from datetime import datetime
+
+from .telegram_integration import TelegramIntegration
 
 class ThemeManager:
     """
@@ -101,194 +104,6 @@ class ThemeManager:
             """)
         
         return theme
-
-class StatisticsChart(QWidget):
-    """
-    Widget para exibir gráficos estatísticos.
-    """
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.init_ui()
-        
-        # Dados iniciais
-        self.received_data = [0]
-        self.success_data = [0]
-        self.error_data = [0]
-        self.time_labels = [0]
-        self.current_time = 0
-        
-        # Timer para atualizar o gráfico
-        self.update_timer = QTimer(self)
-        self.update_timer.timeout.connect(self.update_chart)
-        self.update_timer.start(5000)  # Atualiza a cada 5 segundos
-    
-    def init_ui(self):
-        """Inicializa a interface do widget de gráficos estatísticos."""
-        layout = QVBoxLayout()
-        
-        # Cria a figura do matplotlib
-        self.figure = Figure(figsize=(5, 4), dpi=100)
-        self.canvas = FigureCanvas(self.figure)
-        
-        # Adiciona o canvas ao layout
-        layout.addWidget(self.canvas)
-        
-        # Adiciona botões para alternar entre tipos de gráficos
-        buttons_layout = QHBoxLayout()
-        
-        self.line_button = QPushButton("Gráfico de Linha")
-        self.line_button.clicked.connect(lambda: self.change_chart_type("line"))
-        
-        self.bar_button = QPushButton("Gráfico de Barras")
-        self.bar_button.clicked.connect(lambda: self.change_chart_type("bar"))
-        
-        self.pie_button = QPushButton("Gráfico de Pizza")
-        self.pie_button.clicked.connect(lambda: self.change_chart_type("pie"))
-        
-        buttons_layout.addWidget(self.line_button)
-        buttons_layout.addWidget(self.bar_button)
-        buttons_layout.addWidget(self.pie_button)
-        
-        layout.addLayout(buttons_layout)
-        
-        self.setLayout(layout)
-        
-        # Tipo de gráfico padrão
-        self.chart_type = "line"
-        
-        # Desenha o gráfico inicial
-        self.draw_chart()
-    
-    def update_chart(self):
-        """Atualiza os dados do gráfico com valores simulados."""
-        import random
-        
-        # Incrementa o tempo
-        self.current_time += 5
-        self.time_labels.append(self.current_time)
-        
-        # Limita o número de pontos no gráfico
-        if len(self.time_labels) > 12:
-            self.time_labels = self.time_labels[-12:]
-            self.received_data = self.received_data[-12:]
-            self.success_data = self.success_data[-12:]
-            self.error_data = self.error_data[-12:]
-        
-        # Gera novos dados aleatórios
-        last_received = self.received_data[-1] if self.received_data else 0
-        last_success = self.success_data[-1] if self.success_data else 0
-        last_error = self.error_data[-1] if self.error_data else 0
-        
-        # Adiciona de 0 a 3 novas apostas
-        new_bets = random.randint(0, 3)
-        new_received = last_received + new_bets
-        
-        # Distribui entre sucesso e erro
-        new_success = last_success + random.randint(0, new_bets)
-        new_error = new_received - new_success
-        
-        self.received_data.append(new_received)
-        self.success_data.append(new_success)
-        self.error_data.append(new_error)
-        
-        # Redesenha o gráfico
-        self.draw_chart()
-    
-    def draw_chart(self):
-        """Desenha o gráfico com base no tipo selecionado."""
-        self.figure.clear()
-        
-        if self.chart_type == "line":
-            self.draw_line_chart()
-        elif self.chart_type == "bar":
-            self.draw_bar_chart()
-        elif self.chart_type == "pie":
-            self.draw_pie_chart()
-        
-        self.canvas.draw()
-    
-    def draw_line_chart(self):
-        """Desenha um gráfico de linha."""
-        ax = self.figure.add_subplot(111)
-        
-        # Desenha as linhas
-        ax.plot(self.time_labels, self.received_data, 'b-', label='Recebidas')
-        ax.plot(self.time_labels, self.success_data, 'g-', label='Sucesso')
-        ax.plot(self.time_labels, self.error_data, 'r-', label='Erro')
-        
-        # Configura o gráfico
-        ax.set_title('Apostas ao Longo do Tempo')
-        ax.set_xlabel('Tempo (s)')
-        ax.set_ylabel('Número de Apostas')
-        ax.legend()
-        
-        # Ajusta o layout
-        self.figure.tight_layout()
-    
-    def draw_bar_chart(self):
-        """Desenha um gráfico de barras."""
-        ax = self.figure.add_subplot(111)
-        
-        # Posições das barras
-        x = np.arange(len(self.time_labels))
-        width = 0.25
-        
-        # Desenha as barras
-        ax.bar(x - width, self.received_data, width, label='Recebidas', color='blue')
-        ax.bar(x, self.success_data, width, label='Sucesso', color='green')
-        ax.bar(x + width, self.error_data, width, label='Erro', color='red')
-        
-        # Configura o gráfico
-        ax.set_title('Comparação de Apostas')
-        ax.set_xlabel('Tempo')
-        ax.set_ylabel('Número de Apostas')
-        ax.set_xticks(x)
-        ax.set_xticklabels([str(t) for t in self.time_labels])
-        ax.legend()
-        
-        # Ajusta o layout
-        self.figure.tight_layout()
-    
-    def draw_pie_chart(self):
-        """Desenha um gráfico de pizza."""
-        ax = self.figure.add_subplot(111)
-        
-        # Dados para o gráfico de pizza (último ponto)
-        success = self.success_data[-1] if self.success_data else 0
-        error = self.error_data[-1] if self.error_data else 0
-        
-        # Se não houver dados, mostra um gráfico vazio
-        if success == 0 and error == 0:
-            ax.text(0.5, 0.5, 'Sem dados disponíveis', 
-                   horizontalalignment='center', verticalalignment='center')
-            return
-        
-        # Desenha o gráfico de pizza
-        labels = ['Sucesso', 'Erro']
-        sizes = [success, error]
-        colors = ['green', 'red']
-        explode = (0.1, 0)  # explode a primeira fatia
-        
-        ax.pie(sizes, explode=explode, labels=labels, colors=colors,
-               autopct='%1.1f%%', shadow=True, startangle=90)
-        
-        # Configura o gráfico
-        ax.set_title('Distribuição de Apostas')
-        ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
-        
-        # Ajusta o layout
-        self.figure.tight_layout()
-    
-    def change_chart_type(self, chart_type):
-        """
-        Altera o tipo de gráfico.
-        
-        Args:
-            chart_type: Tipo de gráfico ('line', 'bar', 'pie')
-        """
-        self.chart_type = chart_type
-        self.draw_chart()
 
 class NotificationSystem:
     """
@@ -485,15 +300,17 @@ class TelegramMonitorWidget(QWidget):
     Widget para monitoramento em tempo real das apostas recebidas do Telegram.
     """
     
-    def __init__(self, notification_system=None):
-        super().__init__()
+    def __init__(self, notification_system=None, parent=None):
+        super().__init__(parent)
         self.notification_system = notification_system
+        self.telegram_integration = TelegramIntegration()
         self.init_ui()
         
-        # Timer para simular atualizações em tempo real
-        self.update_timer = QTimer(self)
-        self.update_timer.timeout.connect(self.update_telegram_feed)
-        self.update_timer.start(10000)  # Atualiza a cada 10 segundos
+        # Conecta o sinal de aposta recebida ao método de atualização
+        self.telegram_integration.bet_received.connect(self.on_bet_received)
+        
+        # Inicia a integração com o Telegram
+        self.telegram_integration.start()
     
     def init_ui(self):
         """Inicializa a interface do widget de monitoramento do Telegram."""
@@ -510,51 +327,113 @@ class TelegramMonitorWidget(QWidget):
         layout.addWidget(self.telegram_feed)
         
         self.setLayout(layout)
-        
-        # Carrega mensagens iniciais
-        self.update_telegram_feed()
     
-    def update_telegram_feed(self):
-        """Atualiza o feed de mensagens do Telegram."""
-        # Aqui seria implementada a lógica real de obtenção das mensagens
-        # Esta é uma simulação para demonstração
+    def on_bet_received(self, bet_data):
+        """
+        Manipula uma nova aposta recebida do Telegram.
         
+        Args:
+            bet_data: Dados da aposta (objeto BetData ou dicionário).
+        """
         current_text = self.telegram_feed.toPlainText()
         
-        # Adiciona novas mensagens no topo
-        import random
-        import datetime
+        # Formata a mensagem com os dados da aposta
+        now = datetime.now().strftime("%H:%M:%S")
         
-        # Decide se vai adicionar uma nova mensagem
-        if random.random() < 0.7:  # 70% de chance de adicionar uma nova mensagem
-            # Gera uma nova mensagem aleatória
-            races = ["Royal Ascot - Race 3", "Cheltenham - Race 5", "Epsom - Race 2", 
-                    "Newmarket - Race 4", "Ascot - Race 1"]
-            horses = ["Flying Thunder", "Dark Horse", "Lucky Strike", "Silver Bullet", 
-                     "Golden Touch", "Night Rider", "Fast Lane", "Victory Lap"]
-            odds = [1.8, 2.1, 2.5, 3.0, 3.2, 4.0, 4.5, 5.0]
+        # Verifica se bet_data é um dicionário ou um objeto BetData
+        if isinstance(bet_data, dict):
+            race = bet_data.get("race", "")
+            horse_name = bet_data.get("horse_name", "")
+            odds = bet_data.get("odds", 0.0)
+            stake = bet_data.get("stake", "")
+            bet_type = bet_data.get("bet_type", "win")
+        else:
+            race = bet_data.race
+            horse_name = bet_data.horse_name
+            odds = bet_data.odds
+            stake = bet_data.stake
+            bet_type = bet_data.bet_type
+        
+        new_message = f"[{now}] Nova aposta recebida:\n"
+        new_message += f"Corrida: {race}\n"
+        new_message += f"Cavalo: {horse_name}\n"
+        new_message += f"Odds: {odds}\n"
+        new_message += f"Stake: {stake}\n"
+        new_message += f"Tipo: {bet_type}\n\n"
+        
+        # Adiciona a nova mensagem no topo
+        self.telegram_feed.setText(new_message + current_text)
+        
+        # Adiciona uma notificação
+        if self.notification_system:
+            self.notification_system.add_notification(
+                "Nova Aposta Recebida",
+                f"Recebida aposta para {horse_name} na corrida {race}",
+                "info"
+            )
+        
+        # Aciona a automação para a bolsa de apostas
+        self.trigger_betting_automation(bet_data)
+    
+    def trigger_betting_automation(self, bet_data):
+        """
+        Aciona a automação para a bolsa de apostas.
+        
+        Args:
+            bet_data: Dados da aposta (objeto BetData ou dicionário).
+        """
+        # Aqui você deve implementar a chamada para o módulo de automação da bolsa de apostas
+        # Por exemplo:
+        from ..browser.manager import get_browser_manager
+        
+        try:
+            browser_manager = get_browser_manager()
             
-            race = random.choice(races)
-            horse = random.choice(horses)
-            odd = random.choice(odds)
-            now = datetime.datetime.now().strftime("%H:%M:%S")
+            # Verifica se bet_data é um dicionário ou um objeto BetData
+            if isinstance(bet_data, dict):
+                # Converte para o formato esperado pelo browser_manager
+                from ..database.schemas import Bet
+                bet = Bet(
+                    race=bet_data.get("race", ""),
+                    horse_name=bet_data.get("horse_name", ""),
+                    odds=bet_data.get("odds", 0.0),
+                    stake=bet_data.get("stake"),
+                    bet_type=bet_data.get("bet_type", "win"),
+                    raw_message=bet_data.get("raw_message", ""),
+                    status="pending",
+                    created_at=datetime.now()
+                )
+            else:
+                # Já é um objeto BetData, converte para Bet
+                from ..database.schemas import Bet
+                bet = Bet(
+                    race=bet_data.race,
+                    horse_name=bet_data.horse_name,
+                    odds=bet_data.odds,
+                    stake=bet_data.stake,
+                    bet_type=bet_data.bet_type,
+                    raw_message=bet_data.raw_message,
+                    status="pending",
+                    created_at=datetime.now()
+                )
             
-            new_message = f"[{now}] Nova aposta recebida:\n"
-            new_message += f"Corrida: {race}\n"
-            new_message += f"Cavalo: {horse}\n"
-            new_message += f"Odds: {odd}\n"
-            new_message += f"Stake: 10\n"
-            new_message += f"Tipo: win\n\n"
-            
-            # Adiciona a nova mensagem no topo
-            self.telegram_feed.setText(new_message + current_text)
+            # Adiciona a aposta à fila do navegador
+            browser_manager.add_bet_to_queue(bet)
             
             # Adiciona uma notificação
             if self.notification_system:
                 self.notification_system.add_notification(
-                    "Nova Aposta Recebida",
-                    f"Recebida aposta para {horse} na corrida {race}",
-                    "info"
+                    "Automação Acionada",
+                    f"Aposta para {bet.horse_name} adicionada à fila de automação",
+                    "success"
+                )
+        except Exception as e:
+            # Adiciona uma notificação de erro
+            if self.notification_system:
+                self.notification_system.add_notification(
+                    "Erro na Automação",
+                    f"Erro ao acionar automação: {str(e)}",
+                    "error"
                 )
 
 class BetTrackingWidget(QWidget):
@@ -567,7 +446,7 @@ class BetTrackingWidget(QWidget):
         self.notification_system = notification_system
         self.init_ui()
         
-        # Timer para simular atualizações em tempo real
+        # Timer para atualizar o rastreamento de apostas
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update_bet_tracking)
         self.update_timer.start(15000)  # Atualiza a cada 15 segundos
@@ -598,326 +477,129 @@ class BetTrackingWidget(QWidget):
         self.success_button = QPushButton("Sucesso")
         self.success_button.clicked.connect(lambda: self.filter_bets("success"))
         
+        self.pending_button = QPushButton("Pendentes")
+        self.pending_button.clicked.connect(lambda: self.filter_bets("pending"))
+        
         self.error_button = QPushButton("Erro")
         self.error_button.clicked.connect(lambda: self.filter_bets("error"))
         
         filter_layout.addWidget(self.all_button)
         filter_layout.addWidget(self.success_button)
+        filter_layout.addWidget(self.pending_button)
         filter_layout.addWidget(self.error_button)
-        filter_layout.addStretch()
         
         layout.addLayout(filter_layout)
         
         self.setLayout(layout)
         
-        # Carrega dados iniciais
+        # Filtro atual
+        self.current_filter = "all"
+        
+        # Carrega as apostas iniciais
         self.update_bet_tracking()
     
     def update_bet_tracking(self):
         """Atualiza o rastreamento de apostas."""
-        # Aqui seria implementada a lógica real de obtenção das apostas
-        # Esta é uma simulação para demonstração
+        try:
+            # Obtém as apostas do banco de dados ou armazenamento local
+            from ..database.supabase_client import SupabaseClient
+            import asyncio
+            
+            # Cria uma função assíncrona para obter as apostas
+            async def get_bets():
+                client = SupabaseClient()
+                
+                if self.current_filter == "all":
+                    return await client.get_all_bets()
+                elif self.current_filter == "success":
+                    return await client.get_bets_by_status("completed")
+                elif self.current_filter == "pending":
+                    return await client.get_bets_by_status("pending")
+                elif self.current_filter == "error":
+                    return await client.get_bets_by_status("failed")
+                else:
+                    return await client.get_all_bets()
+            
+            # Executa a função assíncrona
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            bets = loop.run_until_complete(get_bets())
+            loop.close()
+            
+            # Atualiza a tabela
+            self.update_table(bets)
         
-        # Preserva o filtro atual
-        current_filter = getattr(self, "current_filter", "all")
+        except Exception as e:
+            # Adiciona uma notificação de erro
+            if self.notification_system:
+                self.notification_system.add_notification(
+                    "Erro no Rastreamento",
+                    f"Erro ao atualizar rastreamento de apostas: {str(e)}",
+                    "error"
+                )
+    
+    def update_table(self, bets):
+        """
+        Atualiza a tabela com as apostas.
         
-        # Decide se vai adicionar uma nova aposta
-        import random
-        if random.random() < 0.5:  # 50% de chance de adicionar uma nova aposta
-            # Adiciona uma nova aposta aleatória
-            import datetime
-            
-            # Dados de exemplo
-            races = ["Royal Ascot - Race 3", "Cheltenham - Race 5", "Epsom - Race 2", 
-                    "Newmarket - Race 4", "Ascot - Race 1"]
-            horses = ["Flying Thunder", "Dark Horse", "Lucky Strike", "Silver Bullet", 
-                     "Golden Touch", "Night Rider", "Fast Lane", "Victory Lap"]
-            odds = [1.8, 2.1, 2.5, 3.0, 3.2, 4.0, 4.5, 5.0]
-            stakes = [5, 10, 15, 20, 25, 50]
-            statuses = ["Sucesso", "Erro"]
-            
-            # Gera uma nova aposta aleatória
-            bet_id = f"{self.bets_table.rowCount() + 1:03d}"
-            now = datetime.datetime.now().strftime("%H:%M:%S")
-            race = random.choice(races)
-            horse = random.choice(horses)
-            odd = random.choice(odds)
-            stake = random.choice(stakes)
-            status = random.choice(statuses)
-            
-            # Adiciona a nova aposta à tabela
+        Args:
+            bets: Lista de apostas.
+        """
+        # Limpa a tabela
+        self.bets_table.setRowCount(0)
+        
+        # Adiciona as apostas à tabela
+        for bet in bets:
             row = self.bets_table.rowCount()
             self.bets_table.insertRow(row)
             
-            # Preenche os dados da nova aposta
-            self.bets_table.setItem(row, 0, QTableWidgetItem(bet_id))
-            self.bets_table.setItem(row, 1, QTableWidgetItem(now))
-            self.bets_table.setItem(row, 2, QTableWidgetItem(race))
-            self.bets_table.setItem(row, 3, QTableWidgetItem(horse))
-            self.bets_table.setItem(row, 4, QTableWidgetItem(str(odd)))
-            self.bets_table.setItem(row, 5, QTableWidgetItem(str(stake)))
+            # Formata a data/hora
+            created_at = bet.get("created_at", "")
+            if isinstance(created_at, str):
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                    created_at = dt.strftime("%d/%m/%Y %H:%M:%S")
+                except:
+                    pass
             
-            status_item = QTableWidgetItem(status)
-            if status == "Sucesso":
-                status_item.setForeground(QColor("green"))
-            else:
-                status_item.setForeground(QColor("red"))
-            self.bets_table.setItem(row, 6, status_item)
+            # Adiciona os dados à tabela
+            self.bets_table.setItem(row, 0, QTableWidgetItem(str(bet.get("id", ""))))
+            self.bets_table.setItem(row, 1, QTableWidgetItem(str(created_at)))
+            self.bets_table.setItem(row, 2, QTableWidgetItem(str(bet.get("race", ""))))
+            self.bets_table.setItem(row, 3, QTableWidgetItem(str(bet.get("horse_name", ""))))
+            self.bets_table.setItem(row, 4, QTableWidgetItem(str(bet.get("odds", ""))))
+            self.bets_table.setItem(row, 5, QTableWidgetItem(str(bet.get("stake", ""))))
+            self.bets_table.setItem(row, 6, QTableWidgetItem(str(bet.get("status", ""))))
             
-            # Adiciona uma notificação
-            if self.notification_system:
-                if status == "Sucesso":
-                    self.notification_system.add_notification(
-                        "Aposta Realizada com Sucesso",
-                        f"Aposta em {horse} na corrida {race} foi realizada com sucesso",
-                        "success"
-                    )
-                else:
-                    self.notification_system.add_notification(
-                        "Erro ao Realizar Aposta",
-                        f"Falha ao realizar aposta em {horse} na corrida {race}",
-                        "error"
-                    )
-        
-        # Aplica o filtro atual
-        self.filter_bets(current_filter)
+            # Define a cor da linha com base no status
+            status = bet.get("status", "")
+            color = None
+            
+            if status == "completed":
+                color = QColor(200, 255, 200)  # Verde claro
+            elif status == "pending":
+                color = QColor(255, 255, 200)  # Amarelo claro
+            elif status == "failed":
+                color = QColor(255, 200, 200)  # Vermelho claro
+            
+            if color:
+                for col in range(7):
+                    self.bets_table.item(row, col).setBackground(color)
     
     def filter_bets(self, filter_type):
         """
-        Filtra as apostas exibidas na tabela.
+        Filtra as apostas por tipo.
         
         Args:
-            filter_type: Tipo de filtro (all, success, error)
+            filter_type: Tipo de filtro ('all', 'success', 'pending', 'error').
         """
         self.current_filter = filter_type
-        
-        for row in range(self.bets_table.rowCount()):
-            status_item = self.bets_table.item(row, 6)
-            if status_item is None:
-                continue
-                
-            status = status_item.text()
-            
-            if filter_type == "all":
-                self.bets_table.setRowHidden(row, False)
-            elif filter_type == "success" and status == "Sucesso":
-                self.bets_table.setRowHidden(row, False)
-            elif filter_type == "error" and status == "Erro":
-                self.bets_table.setRowHidden(row, False)
-            else:
-                self.bets_table.setRowHidden(row, True)
+        self.update_bet_tracking()
 
-class DashboardTab(QWidget):
+class SettingsWidget(QWidget):
     """
-    Aba de dashboard para monitoramento de apostas.
-    """
-    
-    def __init__(self, notification_system=None):
-        super().__init__()
-        self.notification_system = notification_system
-        self.init_ui()
-        
-        # Timer para atualizar estatísticas
-        self.stats_timer = QTimer(self)
-        self.stats_timer.timeout.connect(self.update_statistics)
-        self.stats_timer.start(5000)  # Atualiza a cada 5 segundos
-    
-    def init_ui(self):
-        """Inicializa a interface da aba de dashboard."""
-        layout = QVBoxLayout()
-        
-        # Cabeçalho com logo e título
-        header_layout = QHBoxLayout()
-        
-        # Logo da Bolsa de Aposta
-        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
-                               "assets", "images", "bolsa_de_aposta_logo.svg")
-        
-        logo_label = QLabel()
-        logo_pixmap = QPixmap(logo_path)
-        logo_label.setPixmap(logo_pixmap)
-        logo_label.setMaximumWidth(150)
-        logo_label.setScaledContents(True)
-        
-        # Título do Dashboard
-        dashboard_title = QLabel("Dashboard de Monitoramento")
-        dashboard_title.setFont(QFont("Arial", 18, QFont.Bold))
-        dashboard_title.setAlignment(Qt.AlignCenter)
-        
-        header_layout.addWidget(logo_label)
-        header_layout.addWidget(dashboard_title, 1)  # Stretch factor 1
-        
-        layout.addLayout(header_layout)
-        
-        # Estatísticas gerais
-        stats_group = QGroupBox("Estatísticas Gerais")
-        stats_layout = QHBoxLayout()
-        
-        # Apostas recebidas
-        received_box = QGroupBox("Apostas Recebidas")
-        received_layout = QVBoxLayout()
-        self.received_count = QLabel("0")
-        self.received_count.setFont(QFont("Arial", 24, QFont.Bold))
-        self.received_count.setAlignment(Qt.AlignCenter)
-        received_layout.addWidget(self.received_count)
-        received_box.setLayout(received_layout)
-        
-        # Apostas com sucesso
-        success_box = QGroupBox("Apostas com Sucesso")
-        success_layout = QVBoxLayout()
-        self.success_count = QLabel("0")
-        self.success_count.setFont(QFont("Arial", 24, QFont.Bold))
-        self.success_count.setAlignment(Qt.AlignCenter)
-        self.success_count.setStyleSheet("color: green;")
-        success_layout.addWidget(self.success_count)
-        success_box.setLayout(success_layout)
-        
-        # Apostas com erro
-        error_box = QGroupBox("Apostas com Erro")
-        error_layout = QVBoxLayout()
-        self.error_count = QLabel("0")
-        self.error_count.setFont(QFont("Arial", 24, QFont.Bold))
-        self.error_count.setAlignment(Qt.AlignCenter)
-        self.error_count.setStyleSheet("color: red;")
-        error_layout.addWidget(self.error_count)
-        error_box.setLayout(error_layout)
-        
-        stats_layout.addWidget(received_box)
-        stats_layout.addWidget(success_box)
-        stats_layout.addWidget(error_box)
-        stats_group.setLayout(stats_layout)
-        
-        layout.addWidget(stats_group)
-        
-        # Gráfico estatístico
-        self.chart_widget = StatisticsChart()
-        layout.addWidget(self.chart_widget)
-        
-        # Splitter para dividir a tela entre monitoramento do Telegram e rastreamento de apostas
-        splitter = QSplitter(Qt.Horizontal)
-        
-        # Widget de monitoramento do Telegram
-        self.telegram_widget = TelegramMonitorWidget(self.notification_system)
-        splitter.addWidget(self.telegram_widget)
-        
-        # Widget de rastreamento de apostas
-        self.tracking_widget = BetTrackingWidget(self.notification_system)
-        splitter.addWidget(self.tracking_widget)
-        
-        # Define tamanhos iniciais
-        splitter.setSizes([400, 600])
-        
-        layout.addWidget(splitter, 1)  # Stretch factor 1
-        
-        # Botões de ação
-        buttons_layout = QHBoxLayout()
-        
-        self.refresh_button = QPushButton("Atualizar Dashboard")
-        self.refresh_button.clicked.connect(self.refresh_dashboard)
-        
-        self.export_button = QPushButton("Exportar Dados")
-        self.export_button.clicked.connect(self.export_data)
-        
-        buttons_layout.addWidget(self.refresh_button)
-        buttons_layout.addWidget(self.export_button)
-        buttons_layout.addStretch()
-        
-        layout.addLayout(buttons_layout)
-        
-        self.setLayout(layout)
-        
-        # Inicializa estatísticas
-        self.update_statistics()
-    
-    def update_statistics(self):
-        """Atualiza as estatísticas do dashboard."""
-        # Aqui seria implementada a lógica real de obtenção das estatísticas
-        # Esta é uma simulação para demonstração
-        
-        import random
-        
-        # Incrementa os contadores aleatoriamente
-        current_received = int(self.received_count.text())
-        current_success = int(self.success_count.text())
-        current_error = int(self.error_count.text())
-        
-        # Adiciona de 0 a 2 novas apostas
-        new_bets = random.randint(0, 2)
-        if new_bets > 0:
-            current_received += new_bets
-            
-            # Distribui entre sucesso e erro
-            new_success = random.randint(0, new_bets)
-            new_error = new_bets - new_success
-            
-            current_success += new_success
-            current_error += new_error
-        
-        # Atualiza os contadores
-        self.received_count.setText(str(current_received))
-        self.success_count.setText(str(current_success))
-        self.error_count.setText(str(current_error))
-    
-    def refresh_dashboard(self):
-        """Atualiza todos os componentes do dashboard."""
-        self.update_statistics()
-        self.telegram_widget.update_telegram_feed()
-        self.tracking_widget.update_bet_tracking()
-        self.chart_widget.update_chart()
-        
-        QMessageBox.information(self, "Dashboard", "Dashboard atualizado com sucesso!")
-    
-    def export_data(self):
-        """Exporta os dados do dashboard para um arquivo CSV."""
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Exportar Dados", "", "CSV Files (*.csv);;All Files (*)"
-        )
-        
-        if file_path:
-            try:
-                with open(file_path, 'w') as f:
-                    # Escreve o cabeçalho
-                    headers = ["ID", "Data/Hora", "Corrida", "Cavalo", "Odds", "Stake", "Status"]
-                    f.write(','.join(headers) + '\n')
-                    
-                    # Escreve os dados da tabela de rastreamento
-                    table = self.tracking_widget.bets_table
-                    for row in range(table.rowCount()):
-                        if not table.isRowHidden(row):
-                            row_data = []
-                            for col in range(table.columnCount()):
-                                item = table.item(row, col)
-                                if item is not None:
-                                    # Escapa vírgulas nos valores
-                                    value = item.text().replace(',', ';')
-                                    row_data.append(value)
-                                else:
-                                    row_data.append("")
-                            f.write(','.join(row_data) + '\n')
-                
-                QMessageBox.information(self, "Exportação", f"Dados exportados com sucesso para {file_path}")
-                
-                # Adiciona uma notificação
-                if self.notification_system:
-                    self.notification_system.add_notification(
-                        "Dados Exportados",
-                        f"Os dados foram exportados com sucesso para {os.path.basename(file_path)}",
-                        "success"
-                    )
-            except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Erro ao exportar dados: {e}")
-                
-                # Adiciona uma notificação de erro
-                if self.notification_system:
-                    self.notification_system.add_notification(
-                        "Erro na Exportação",
-                        f"Falha ao exportar dados: {str(e)}",
-                        "error"
-                    )
-
-class ConfigTab(QWidget):
-    """
-    Aba de configurações da aplicação.
+    Widget para configurações da aplicação.
     """
     
     def __init__(self, notification_system=None):
@@ -926,10 +608,18 @@ class ConfigTab(QWidget):
         self.init_ui()
     
     def init_ui(self):
-        """Inicializa a interface da aba de configurações."""
+        """Inicializa a interface do widget de configurações."""
         layout = QVBoxLayout()
         
-        # Grupo de configurações do Telegram
+        # Título
+        title = QLabel("Configurações")
+        title.setFont(QFont("Arial", 12, QFont.Bold))
+        layout.addWidget(title)
+        
+        # Formulário de configurações
+        form_layout = QFormLayout()
+        
+        # Configurações do Telegram
         telegram_group = QGroupBox("Configurações do Telegram")
         telegram_layout = QFormLayout()
         
@@ -941,342 +631,187 @@ class ConfigTab(QWidget):
         telegram_layout.addRow("API ID:", self.api_id_input)
         telegram_layout.addRow("API Hash:", self.api_hash_input)
         telegram_layout.addRow("Bot Token:", self.bot_token_input)
-        telegram_layout.addRow("ID do Grupo:", self.group_id_input)
+        telegram_layout.addRow("Group ID:", self.group_id_input)
         
         telegram_group.setLayout(telegram_layout)
+        form_layout.addRow(telegram_group)
         
-        # Grupo de configurações do Supabase
-        supabase_group = QGroupBox("Configurações do Supabase")
-        supabase_layout = QFormLayout()
-        
-        self.supabase_url_input = QLineEdit()
-        self.supabase_key_input = QLineEdit()
-        
-        supabase_layout.addRow("URL:", self.supabase_url_input)
-        supabase_layout.addRow("Chave:", self.supabase_key_input)
-        
-        supabase_group.setLayout(supabase_layout)
-        
-        # Grupo de configurações do navegador
-        browser_group = QGroupBox("Configurações do Navegador")
-        browser_layout = QFormLayout()
-        
-        self.browser_type_combo = QComboBox()
-        self.browser_type_combo.addItems(["Chrome", "Firefox", "Edge"])
-        
-        self.headless_check = QCheckBox("Modo Headless")
-        
-        browser_layout.addRow("Navegador:", self.browser_type_combo)
-        browser_layout.addRow("", self.headless_check)
-        
-        browser_group.setLayout(browser_layout)
-        
-        # Grupo de configurações da interface
-        ui_group = QGroupBox("Configurações da Interface")
-        ui_layout = QFormLayout()
-        
-        self.theme_combo = QComboBox()
-        self.theme_combo.addItems(["Tema Claro", "Tema Escuro"])
-        self.theme_combo.currentIndexChanged.connect(self.theme_changed)
-        
-        self.notifications_check = QCheckBox("Ativar Notificações")
-        self.notifications_check.setChecked(True)
-        
-        self.mobile_check = QCheckBox("Otimizar para Dispositivos Móveis")
-        
-        ui_layout.addRow("Tema:", self.theme_combo)
-        ui_layout.addRow("", self.notifications_check)
-        ui_layout.addRow("", self.mobile_check)
-        
-        ui_group.setLayout(ui_layout)
-        
-        # Botões de ação
-        buttons_layout = QHBoxLayout()
-        
-        self.save_button = QPushButton("Salvar Configurações")
-        self.save_button.clicked.connect(self.save_config)
-        
-        self.test_button = QPushButton("Testar Conexões")
-        self.test_button.clicked.connect(self.test_connections)
-        
-        buttons_layout.addWidget(self.save_button)
-        buttons_layout.addWidget(self.test_button)
-        
-        # Adiciona os widgets ao layout principal
-        layout.addWidget(telegram_group)
-        layout.addWidget(supabase_group)
-        layout.addWidget(browser_group)
-        layout.addWidget(ui_group)
-        layout.addLayout(buttons_layout)
-        
-        # Adiciona espaço em branco no final
-        layout.addStretch()
-        
-        self.setLayout(layout)
-    
-    def theme_changed(self, index):
-        """
-        Manipula a mudança de tema.
-        
-        Args:
-            index: Índice do tema selecionado
-        """
-        # Aqui seria implementada a lógica real de mudança de tema
-        # Esta é uma simulação para demonstração
-        
-        # Emite um sinal para a janela principal
-        window = self.window()
-        if hasattr(window, "change_theme"):
-            window.change_theme(index == 1)  # True para tema escuro
-    
-    def save_config(self):
-        """Salva as configurações."""
-        # Aqui seria implementada a lógica real de salvamento das configurações
-        QMessageBox.information(self, "Configurações", "Configurações salvas com sucesso!")
-        
-        # Adiciona uma notificação
-        if self.notification_system and self.notifications_check.isChecked():
-            self.notification_system.add_notification(
-                "Configurações Salvas",
-                "As configurações foram salvas com sucesso",
-                "success"
-            )
-    
-    def test_connections(self):
-        """Testa as conexões com as APIs."""
-        # Aqui seria implementada a lógica real de teste das conexões
-        QMessageBox.information(self, "Teste de Conexões", "Todas as conexões estão funcionando corretamente!")
-        
-        # Adiciona uma notificação
-        if self.notification_system and self.notifications_check.isChecked():
-            self.notification_system.add_notification(
-                "Conexões Testadas",
-                "Todas as conexões estão funcionando corretamente",
-                "success"
-            )
-
-class BettingTab(QWidget):
-    """
-    Aba de configurações de apostas.
-    """
-    
-    def __init__(self, notification_system=None):
-        super().__init__()
-        self.notification_system = notification_system
-        self.init_ui()
-    
-    def init_ui(self):
-        """Inicializa a interface da aba de apostas."""
-        layout = QVBoxLayout()
-        
-        # Grupo de configurações de apostas
+        # Configurações de apostas
         betting_group = QGroupBox("Configurações de Apostas")
         betting_layout = QFormLayout()
         
-        self.default_stake_spin = QDoubleSpinBox()
-        self.default_stake_spin.setRange(1, 1000)
-        self.default_stake_spin.setValue(10)
-        self.default_stake_spin.setSingleStep(1)
+        self.default_stake_input = QDoubleSpinBox()
+        self.default_stake_input.setRange(1, 1000)
+        self.default_stake_input.setValue(10)
+        self.default_stake_input.setSingleStep(1)
         
-        self.min_stake_spin = QDoubleSpinBox()
-        self.min_stake_spin.setRange(1, 100)
-        self.min_stake_spin.setValue(5)
-        self.min_stake_spin.setSingleStep(1)
+        self.max_stake_input = QDoubleSpinBox()
+        self.max_stake_input.setRange(1, 1000)
+        self.max_stake_input.setValue(100)
+        self.max_stake_input.setSingleStep(10)
         
-        self.max_stake_spin = QDoubleSpinBox()
-        self.max_stake_spin.setRange(10, 10000)
-        self.max_stake_spin.setValue(100)
-        self.max_stake_spin.setSingleStep(10)
+        self.min_stake_input = QDoubleSpinBox()
+        self.min_stake_input.setRange(1, 1000)
+        self.min_stake_input.setValue(5)
+        self.min_stake_input.setSingleStep(1)
         
-        betting_layout.addRow("Stake Padrão:", self.default_stake_spin)
-        betting_layout.addRow("Stake Mínimo:", self.min_stake_spin)
-        betting_layout.addRow("Stake Máximo:", self.max_stake_spin)
+        betting_layout.addRow("Stake Padrão:", self.default_stake_input)
+        betting_layout.addRow("Stake Máximo:", self.max_stake_input)
+        betting_layout.addRow("Stake Mínimo:", self.min_stake_input)
         
         betting_group.setLayout(betting_layout)
+        form_layout.addRow(betting_group)
         
-        # Grupo de configurações avançadas
-        advanced_group = QGroupBox("Configurações Avançadas")
-        advanced_layout = QFormLayout()
+        # Configurações do navegador
+        browser_group = QGroupBox("Configurações do Navegador")
+        browser_layout = QFormLayout()
         
-        self.auto_login_check = QCheckBox("Login Automático")
-        self.auto_login_check.setChecked(True)
+        self.browser_type_input = QComboBox()
+        self.browser_type_input.addItems(["chrome", "firefox", "edge"])
         
-        self.retry_count_spin = QSpinBox()
-        self.retry_count_spin.setRange(1, 10)
-        self.retry_count_spin.setValue(3)
+        self.headless_input = QCheckBox()
         
-        advanced_layout.addRow("", self.auto_login_check)
-        advanced_layout.addRow("Tentativas de Retry:", self.retry_count_spin)
+        browser_layout.addRow("Tipo de Navegador:", self.browser_type_input)
+        browser_layout.addRow("Modo Headless:", self.headless_input)
         
-        advanced_group.setLayout(advanced_layout)
+        browser_group.setLayout(browser_layout)
+        form_layout.addRow(browser_group)
+        
+        # Configurações da aplicação
+        app_group = QGroupBox("Configurações da Aplicação")
+        app_layout = QFormLayout()
+        
+        self.debug_mode_input = QCheckBox()
+        
+        self.log_level_input = QComboBox()
+        self.log_level_input.addItems(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+        self.log_level_input.setCurrentText("INFO")
+        
+        app_layout.addRow("Modo Debug:", self.debug_mode_input)
+        app_layout.addRow("Nível de Log:", self.log_level_input)
+        
+        app_group.setLayout(app_layout)
+        form_layout.addRow(app_group)
+        
+        layout.addLayout(form_layout)
         
         # Botões de ação
         buttons_layout = QHBoxLayout()
         
-        self.save_button = QPushButton("Salvar Configurações")
-        self.save_button.clicked.connect(self.save_config)
+        self.load_button = QPushButton("Carregar")
+        self.load_button.clicked.connect(self.load_settings)
         
+        self.save_button = QPushButton("Salvar")
+        self.save_button.clicked.connect(self.save_settings)
+        
+        buttons_layout.addWidget(self.load_button)
         buttons_layout.addWidget(self.save_button)
         
-        # Adiciona os widgets ao layout principal
-        layout.addWidget(betting_group)
-        layout.addWidget(advanced_group)
-        layout.addLayout(buttons_layout)
-        
-        # Adiciona espaço em branco no final
-        layout.addStretch()
-        
-        self.setLayout(layout)
-    
-    def save_config(self):
-        """Salva as configurações de apostas."""
-        # Aqui seria implementada a lógica real de salvamento das configurações
-        QMessageBox.information(self, "Configurações de Apostas", "Configurações de apostas salvas com sucesso!")
-        
-        # Adiciona uma notificação
-        if self.notification_system:
-            self.notification_system.add_notification(
-                "Configurações de Apostas Salvas",
-                "As configurações de apostas foram salvas com sucesso",
-                "success"
-            )
-
-class LogTab(QWidget):
-    """
-    Aba de visualização de logs.
-    """
-    
-    def __init__(self, notification_system=None):
-        super().__init__()
-        self.notification_system = notification_system
-        self.init_ui()
-    
-    def init_ui(self):
-        """Inicializa a interface da aba de logs."""
-        layout = QVBoxLayout()
-        
-        # Área de texto para exibição de logs
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        
-        # Botões de ação
-        buttons_layout = QHBoxLayout()
-        
-        self.refresh_button = QPushButton("Atualizar Logs")
-        self.refresh_button.clicked.connect(self.refresh_logs)
-        
-        self.clear_button = QPushButton("Limpar Logs")
-        self.clear_button.clicked.connect(self.clear_logs)
-        
-        self.export_button = QPushButton("Exportar Logs")
-        self.export_button.clicked.connect(self.export_logs)
-        
-        buttons_layout.addWidget(self.refresh_button)
-        buttons_layout.addWidget(self.clear_button)
-        buttons_layout.addWidget(self.export_button)
-        
-        # Adiciona os widgets ao layout principal
-        layout.addWidget(self.log_text)
         layout.addLayout(buttons_layout)
         
         self.setLayout(layout)
         
-        # Carrega os logs iniciais
-        self.refresh_logs()
+        # Carrega as configurações iniciais
+        self.load_settings()
     
-    def refresh_logs(self):
-        """Atualiza a exibição de logs."""
+    def load_settings(self):
+        """Carrega as configurações do arquivo .env."""
         try:
-            # Aqui seria implementada a lógica real de carregamento de logs
-            import datetime
-            now = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            from ..config.settings import get_config
             
-            self.log_text.setText(f"Logs carregados em {now}\n\n" +
-                                 "INFO: Sistema iniciado\n" +
-                                 "INFO: Conectado ao Telegram\n" +
-                                 "INFO: Conectado ao Supabase\n" +
-                                 "INFO: Navegador inicializado\n" +
-                                 "INFO: Aguardando apostas...\n" +
-                                 f"INFO: Dashboard atualizado em {now}\n" +
-                                 "INFO: Nova aposta recebida do Telegram\n" +
-                                 "INFO: Processando aposta...\n" +
-                                 "INFO: Aposta realizada com sucesso\n" +
-                                 "INFO: Dados salvos no Supabase")
+            config = get_config()
+            
+            # Configurações do Telegram
+            self.api_id_input.setText(str(config["telegram"]["api_id"] or ""))
+            self.api_hash_input.setText(str(config["telegram"]["api_hash"] or ""))
+            self.bot_token_input.setText(str(config["telegram"]["bot_token"] or ""))
+            self.group_id_input.setText(str(config["telegram"]["group_id"] or ""))
+            
+            # Configurações de apostas
+            self.default_stake_input.setValue(float(config["betting"]["default_stake"] or 10))
+            self.max_stake_input.setValue(float(config["betting"]["max_stake"] or 100))
+            self.min_stake_input.setValue(float(config["betting"]["min_stake"] or 5))
+            
+            # Configurações do navegador
+            self.browser_type_input.setCurrentText(str(config["browser"]["type"] or "chrome"))
+            self.headless_input.setChecked(bool(config["browser"]["headless"]))
+            
+            # Configurações da aplicação
+            self.debug_mode_input.setChecked(bool(config["app"]["debug"]))
+            self.log_level_input.setCurrentText(str(config["app"]["log_level"] or "INFO"))
+            
+            # Adiciona uma notificação
+            if self.notification_system:
+                self.notification_system.add_notification(
+                    "Configurações Carregadas",
+                    "As configurações foram carregadas com sucesso.",
+                    "success"
+                )
+        
         except Exception as e:
-            self.log_text.setText(f"Erro ao carregar logs: {e}")
-            
             # Adiciona uma notificação de erro
             if self.notification_system:
                 self.notification_system.add_notification(
-                    "Erro nos Logs",
-                    f"Falha ao carregar logs: {str(e)}",
+                    "Erro ao Carregar Configurações",
+                    f"Erro ao carregar configurações: {str(e)}",
                     "error"
                 )
     
-    def clear_logs(self):
-        """Limpa a exibição de logs."""
-        self.log_text.clear()
-    
-    def export_logs(self):
-        """Exporta os logs para um arquivo de texto."""
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Exportar Logs", "", "Text Files (*.txt);;All Files (*)"
-        )
-        
-        if file_path:
-            try:
-                with open(file_path, 'w') as f:
-                    f.write(self.log_text.toPlainText())
-                
-                QMessageBox.information(self, "Exportação", f"Logs exportados com sucesso para {file_path}")
-                
-                # Adiciona uma notificação
-                if self.notification_system:
-                    self.notification_system.add_notification(
-                        "Logs Exportados",
-                        f"Os logs foram exportados com sucesso para {os.path.basename(file_path)}",
-                        "success"
-                    )
-            except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Erro ao exportar logs: {e}")
-                
-                # Adiciona uma notificação de erro
-                if self.notification_system:
-                    self.notification_system.add_notification(
-                        "Erro na Exportação",
-                        f"Falha ao exportar logs: {str(e)}",
-                        "error"
-                    )
+    def save_settings(self):
+        """Salva as configurações no arquivo .env."""
+        try:
+            import os
+            from dotenv import load_dotenv
+            
+            # Carrega o arquivo .env atual
+            env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
+            load_dotenv(env_path)
+            
+            # Prepara as novas configurações
+            new_env = f"""# Credenciais do Telegram
+TELEGRAM_API_ID={self.api_id_input.text()}
+TELEGRAM_API_HASH={self.api_hash_input.text()}
+TELEGRAM_BOT_TOKEN={self.bot_token_input.text()}
+TELEGRAM_GROUP_ID={self.group_id_input.text()}
 
-class StatusThread(QThread):
-    """
-    Thread para monitorar o status do sistema.
-    """
-    status_update = pyqtSignal(str, str)  # (status_type, message)
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.running = False
-    
-    def run(self):
-        """Executa o monitoramento de status."""
-        self.running = True
-        while self.running:
-            # Aqui seria implementada a lógica real de monitoramento
-            # Por exemplo, verificar se o bot do Telegram está conectado
-            # e se o navegador está funcionando corretamente
+# Credenciais do Supabase
+SUPABASE_URL={os.getenv("SUPABASE_URL", "sua_url_supabase")}
+SUPABASE_KEY={os.getenv("SUPABASE_KEY", "sua_chave_supabase")}
+
+# Configurações de apostas
+DEFAULT_STAKE={self.default_stake_input.value()}
+MAX_STAKE={self.max_stake_input.value()}
+MIN_STAKE={self.min_stake_input.value()}
+
+# Configurações do navegador
+BROWSER_TYPE={self.browser_type_input.currentText()}
+HEADLESS={"true" if self.headless_input.isChecked() else "false"}
+
+# Configurações da aplicação
+DEBUG_MODE={"true" if self.debug_mode_input.isChecked() else "false"}
+LOG_LEVEL={self.log_level_input.currentText()}
+"""
             
-            # Simulação de status para demonstração
-            self.status_update.emit("telegram", "Conectado")
-            self.status_update.emit("browser", "Pronto")
-            self.status_update.emit("database", "Conectado")
+            # Salva as novas configurações
+            with open(env_path, "w") as f:
+                f.write(new_env)
             
-            # Aguarda 5 segundos antes da próxima verificação
-            self.sleep(5)
-    
-    def stop(self):
-        """Para o monitoramento de status."""
-        self.running = False
+            # Adiciona uma notificação
+            if self.notification_system:
+                self.notification_system.add_notification(
+                    "Configurações Salvas",
+                    "As configurações foram salvas com sucesso.",
+                    "success"
+                )
+        
+        except Exception as e:
+            # Adiciona uma notificação de erro
+            if self.notification_system:
+                self.notification_system.add_notification(
+                    "Erro ao Salvar Configurações",
+                    f"Erro ao salvar configurações: {str(e)}",
+                    "error"
+                )
 
 class MainWindow(QMainWindow):
     """
@@ -1285,265 +820,56 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        
-        # Inicializa o sistema de notificações
-        self.notification_system = NotificationSystem(self)
-        
-        # Inicializa a interface
         self.init_ui()
-        
-        # Inicializa a thread de status
-        self.status_thread = StatusThread(self)
-        self.status_thread.status_update.connect(self.update_status)
-        self.status_thread.start()
-        
-        # Tema padrão (claro)
-        self.is_dark_theme = False
     
     def init_ui(self):
         """Inicializa a interface da janela principal."""
-        self.setWindowTitle("RPA Apostas Esportivas - Bolsa de Aposta")
-        self.setGeometry(100, 100, 1200, 900)
+        # Configura a janela
+        self.setWindowTitle("RPA Apostas Esportivas")
+        self.setGeometry(100, 100, 1200, 800)
         
-        # Widget central com layout principal
+        # Cria o sistema de notificações
+        self.notification_system = NotificationSystem(self)
+        
+        # Cria o widget central
         central_widget = QWidget()
-        main_layout = QVBoxLayout(central_widget)
-        
-        # Widget de abas
-        self.tabs = QTabWidget()
-        
-        # Cria as abas
-        self.dashboard_tab = DashboardTab(self.notification_system)
-        self.config_tab = ConfigTab(self.notification_system)
-        self.betting_tab = BettingTab(self.notification_system)
-        self.log_tab = LogTab(self.notification_system)
-        self.notifications_tab = NotificationsWidget(self.notification_system)
-        
-        # Adiciona as abas ao widget de abas
-        self.tabs.addTab(self.dashboard_tab, "Dashboard")
-        self.tabs.addTab(self.config_tab, "Configurações")
-        self.tabs.addTab(self.betting_tab, "Apostas")
-        self.tabs.addTab(self.log_tab, "Logs")
-        self.tabs.addTab(self.notifications_tab, "Notificações")
-        
-        # Adiciona o widget de abas ao layout principal
-        main_layout.addWidget(self.tabs)
-        
-        # Define o widget central
         self.setCentralWidget(central_widget)
         
-        # Barra de status
-        self.statusBar().showMessage("Pronto")
+        # Layout principal
+        main_layout = QVBoxLayout(central_widget)
         
-        # Adiciona widgets permanentes à barra de status
-        self.telegram_status = QLabel("Telegram: Desconectado")
-        self.browser_status = QLabel("Navegador: Inativo")
-        self.database_status = QLabel("Banco de Dados: Desconectado")
+        # Cria as abas
+        tabs = QTabWidget()
         
-        self.statusBar().addPermanentWidget(self.telegram_status)
-        self.statusBar().addPermanentWidget(self.browser_status)
-        self.statusBar().addPermanentWidget(self.database_status)
+        # Aba de Dashboard
+        dashboard_tab = QWidget()
+        dashboard_layout = QVBoxLayout(dashboard_tab)
         
-        # Barra de ferramentas
-        toolbar = self.addToolBar("Controles")
-        toolbar.setIconSize(Qt.QSize(24, 24))
+        # Adiciona widgets à aba de Dashboard
+        dashboard_layout.addWidget(TelegramMonitorWidget(self.notification_system))
+        dashboard_layout.addWidget(BetTrackingWidget(self.notification_system))
         
-        # Ações da barra de ferramentas
-        start_action = QAction("Iniciar", self)
-        start_action.triggered.connect(self.start_automation)
-        toolbar.addAction(start_action)
+        # Aba de Configurações
+        settings_tab = SettingsWidget(self.notification_system)
         
-        stop_action = QAction("Parar", self)
-        stop_action.triggered.connect(self.stop_automation)
-        toolbar.addAction(stop_action)
+        # Aba de Notificações
+        notifications_tab = NotificationsWidget(self.notification_system)
         
-        toolbar.addSeparator()
+        # Adiciona as abas ao widget de abas
+        tabs.addTab(dashboard_tab, "Dashboard")
+        tabs.addTab(settings_tab, "Configurações")
+        tabs.addTab(notifications_tab, "Notificações")
         
-        dashboard_action = QAction("Dashboard", self)
-        dashboard_action.triggered.connect(lambda: self.tabs.setCurrentIndex(0))
-        toolbar.addAction(dashboard_action)
+        # Adiciona o widget de abas ao layout principal
+        main_layout.addWidget(tabs)
         
-        settings_action = QAction("Configurações", self)
-        settings_action.triggered.connect(lambda: self.tabs.setCurrentIndex(1))
-        toolbar.addAction(settings_action)
-        
-        export_action = QAction("Exportar Dados", self)
-        export_action.triggered.connect(self.export_data)
-        toolbar.addAction(export_action)
-        
-        toolbar.addSeparator()
-        
-        # Ação para alternar o tema
-        self.theme_action = QAction("Tema Escuro", self)
-        self.theme_action.setCheckable(True)
-        self.theme_action.triggered.connect(self.toggle_theme)
-        toolbar.addAction(self.theme_action)
-        
-        # Menu principal
-        menu_bar = self.menuBar()
-        
-        # Menu Arquivo
-        file_menu = menu_bar.addMenu("Arquivo")
-        
-        export_menu_action = QAction("Exportar Dados", self)
-        export_menu_action.triggered.connect(self.export_data)
-        file_menu.addAction(export_menu_action)
-        
-        export_logs_action = QAction("Exportar Logs", self)
-        export_logs_action.triggered.connect(self.log_tab.export_logs)
-        file_menu.addAction(export_logs_action)
-        
-        file_menu.addSeparator()
-        
-        exit_action = QAction("Sair", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        
-        # Menu Visualizar
-        view_menu = menu_bar.addMenu("Visualizar")
-        
-        theme_menu_action = QAction("Tema Escuro", self)
-        theme_menu_action.setCheckable(True)
-        theme_menu_action.triggered.connect(self.toggle_theme)
-        view_menu.addAction(theme_menu_action)
-        
-        view_menu.addSeparator()
-        
-        for i, tab_name in enumerate(["Dashboard", "Configurações", "Apostas", "Logs", "Notificações"]):
-            tab_action = QAction(tab_name, self)
-            tab_action.triggered.connect(lambda checked, index=i: self.tabs.setCurrentIndex(index))
-            view_menu.addAction(tab_action)
-        
-        # Menu Ajuda
-        help_menu = menu_bar.addMenu("Ajuda")
-        
-        about_action = QAction("Sobre", self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
-        
-        # Adiciona uma notificação de boas-vindas
-        self.notification_system.add_notification(
-            "Bem-vindo ao RPA Apostas Esportivas",
-            "O sistema foi iniciado com sucesso e está pronto para uso",
-            "info"
-        )
-    
-    def update_status(self, status_type, message):
-        """
-        Atualiza o status na barra de status.
-        
-        Args:
-            status_type: Tipo de status (telegram, browser, database)
-            message: Mensagem de status
-        """
-        if status_type == "telegram":
-            self.telegram_status.setText(f"Telegram: {message}")
-        elif status_type == "browser":
-            self.browser_status.setText(f"Navegador: {message}")
-        elif status_type == "database":
-            self.database_status.setText(f"Banco de Dados: {message}")
-    
-    def start_automation(self):
-        """Inicia a automação de apostas."""
-        # Aqui seria implementada a lógica real de inicialização da automação
-        QMessageBox.information(self, "Automação", "Iniciando automação de apostas...")
-        self.statusBar().showMessage("Automação iniciada")
-        
-        # Atualiza o dashboard após iniciar a automação
-        self.dashboard_tab.refresh_dashboard()
-        
-        # Adiciona uma notificação
-        self.notification_system.add_notification(
-            "Automação Iniciada",
-            "A automação de apostas foi iniciada com sucesso",
-            "success"
-        )
-    
-    def stop_automation(self):
-        """Para a automação de apostas."""
-        # Aqui seria implementada a lógica real de parada da automação
-        QMessageBox.information(self, "Automação", "Parando automação de apostas...")
-        self.statusBar().showMessage("Automação parada")
-        
-        # Adiciona uma notificação
-        self.notification_system.add_notification(
-            "Automação Parada",
-            "A automação de apostas foi interrompida",
-            "warning"
-        )
-    
-    def export_data(self):
-        """Exporta os dados do dashboard."""
-        # Redireciona para a função de exportação do dashboard
-        self.dashboard_tab.export_data()
-    
-    def toggle_theme(self, checked):
-        """
-        Alterna entre os temas claro e escuro.
-        
-        Args:
-            checked: Se True, ativa o tema escuro; caso contrário, ativa o tema claro
-        """
-        self.change_theme(checked)
-        
-        # Atualiza o texto da ação
-        self.theme_action.setText("Tema Claro" if checked else "Tema Escuro")
-    
-    def change_theme(self, is_dark):
-        """
-        Muda o tema da aplicação.
-        
-        Args:
-            is_dark: Se True, aplica o tema escuro; caso contrário, aplica o tema claro
-        """
-        self.is_dark_theme = is_dark
-        
-        # Aplica o tema
+        # Configura o tema
         app = QApplication.instance()
-        ThemeManager.apply_theme(app, is_dark)
+        ThemeManager.apply_theme(app, is_dark=False)
         
-        # Atualiza o texto da ação
-        self.theme_action.setText("Tema Claro" if is_dark else "Tema Escuro")
-        self.theme_action.setChecked(is_dark)
-        
-        # Adiciona uma notificação
-        theme_name = "escuro" if is_dark else "claro"
+        # Exibe uma notificação de boas-vindas
         self.notification_system.add_notification(
-            "Tema Alterado",
-            f"O tema da aplicação foi alterado para {theme_name}",
+            "Bem-vindo",
+            "Bem-vindo ao RPA de Apostas Esportivas!",
             "info"
         )
-    
-    def show_about(self):
-        """Exibe a caixa de diálogo 'Sobre'."""
-        QMessageBox.about(
-            self,
-            "Sobre RPA Apostas Esportivas",
-            "<h1>RPA Apostas Esportivas</h1>"
-            "<p>Versão 1.0</p>"
-            "<p>Um sistema de automação para apostas esportivas utilizando RPA.</p>"
-            "<p>Desenvolvido para Bolsa de Aposta.</p>"
-            "<p>&copy; 2025 Todos os direitos reservados.</p>"
-        )
-    
-    def closeEvent(self, event):
-        """Manipula o evento de fechamento da janela."""
-        # Para a thread de status
-        self.status_thread.stop()
-        self.status_thread.wait()
-        
-        # Aceita o evento de fechamento
-        event.accept()
-
-def run_gui():
-    """
-    Função principal para executar a interface gráfica.
-    """
-    app = QApplication(sys.argv)
-    
-    # Aplica o tema padrão (claro)
-    ThemeManager.apply_theme(app, False)
-    
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())

@@ -51,7 +51,13 @@ class MessageParser:
         r"Aposta:\s*(.+?)\s*-\s*(.+?)\s*@\s*(\d+\.?\d*)",
         
         # Padrão 3: Formato alternativo
-        r"Corrida\s*(.+?)\s*:\s*(.+?)\s*\((\d+\.?\d*)\)"
+        r"Corrida\s*(.+?)\s*:\s*(.+?)\s*\((\d+\.?\d*)\)",
+        
+        # Padrão 4: Formato simples com nome do cavalo e odds
+        r"(?:Apostar em|Bet on)?\s*(.+?)\s*(?:na corrida|in race)\s*(.+?)\s*(?:@|odds)\s*(\d+\.?\d*)",
+        
+        # Padrão 5: Formato inverso com corrida primeiro
+        r"(?:Corrida|Race)\s*(.+?)\s*(?:cavalo|horse)\s*(.+?)\s*(?:@|odds)\s*(\d+\.?\d*)"
     ]
     
     @classmethod
@@ -65,21 +71,34 @@ class MessageParser:
         Returns:
             BetData: Objeto com dados da aposta ou None se não for uma aposta válida.
         """
+        # Registra a mensagem para depuração
+        logger.debug(f"Analisando mensagem: {message_text[:100]}...")
+        
         for pattern in cls.PATTERNS:
             try:
-                match = re.search(pattern, message_text, re.DOTALL)
+                match = re.search(pattern, message_text, re.DOTALL | re.IGNORECASE)
                 if match:
-                    race = match.group(1).strip()
-                    horse_name = match.group(2).strip()
+                    # Dependendo do padrão, a ordem dos grupos pode variar
+                    if "na corrida" in pattern or "in race" in pattern:
+                        # Padrão 4: cavalo, corrida, odds
+                        horse_name = match.group(1).strip()
+                        race = match.group(2).strip()
+                    else:
+                        # Padrões 1, 2, 3, 5: corrida, cavalo, odds
+                        race = match.group(1).strip()
+                        horse_name = match.group(2).strip()
+                    
                     odds = float(match.group(3).strip())
                     
                     # Extrai stake se disponível
-                    stake_match = re.search(r"Stake:\s*(\d+\.?\d*)", message_text)
+                    stake_match = re.search(r"(?:Stake|stake|STAKE):\s*(\d+\.?\d*)", message_text, re.IGNORECASE)
                     stake = float(stake_match.group(1)) if stake_match else None
                     
                     # Extrai tipo de aposta se disponível
-                    bet_type_match = re.search(r"Tipo:\s*(.+?)(?:\n|$)", message_text)
+                    bet_type_match = re.search(r"(?:Tipo|tipo|TYPE|type):\s*(.+?)(?:\n|$)", message_text, re.IGNORECASE)
                     bet_type = bet_type_match.group(1).strip() if bet_type_match else "win"
+                    
+                    logger.info(f"Aposta extraída: {horse_name} na corrida {race} @ {odds}")
                     
                     return BetData(
                         race=race,
@@ -97,15 +116,28 @@ class MessageParser:
         # Tenta uma abordagem mais flexível se os padrões anteriores falharem
         try:
             # Busca por palavras-chave e proximidade
-            if "cavalo" in message_text.lower() and "corrida" in message_text.lower():
+            message_lower = message_text.lower()
+            if ("cavalo" in message_lower or "horse" in message_lower) and ("corrida" in message_lower or "race" in message_lower):
                 # Tenta encontrar o nome do cavalo
-                horse_lines = [line for line in message_text.split('\n') if "cavalo" in line.lower()]
-                race_lines = [line for line in message_text.split('\n') if "corrida" in line.lower()]
-                odds_lines = [line for line in message_text.split('\n') if "odds" in line.lower() or "@" in line]
+                horse_lines = [line for line in message_text.split('\n') 
+                              if "cavalo" in line.lower() or "horse" in line.lower()]
+                race_lines = [line for line in message_text.split('\n') 
+                             if "corrida" in line.lower() or "race" in line.lower()]
+                odds_lines = [line for line in message_text.split('\n') 
+                             if "odds" in line.lower() or "@" in line]
                 
                 if horse_lines and race_lines:
-                    horse_name = horse_lines[0].split(":", 1)[1].strip() if ":" in horse_lines[0] else horse_lines[0].replace("cavalo", "", flags=re.IGNORECASE).strip()
-                    race = race_lines[0].split(":", 1)[1].strip() if ":" in race_lines[0] else race_lines[0].replace("corrida", "", flags=re.IGNORECASE).strip()
+                    # Extrai nome do cavalo
+                    if ":" in horse_lines[0]:
+                        horse_name = horse_lines[0].split(":", 1)[1].strip()
+                    else:
+                        horse_name = re.sub(r'(?:cavalo|horse)', '', horse_lines[0], flags=re.IGNORECASE).strip()
+                    
+                    # Extrai nome da corrida
+                    if ":" in race_lines[0]:
+                        race = race_lines[0].split(":", 1)[1].strip()
+                    else:
+                        race = re.sub(r'(?:corrida|race)', '', race_lines[0], flags=re.IGNORECASE).strip()
                     
                     # Tenta extrair odds
                     odds = None
@@ -116,6 +148,7 @@ class MessageParser:
                             odds = float(odds_match.group(1))
                     
                     if horse_name and race and odds:
+                        logger.info(f"Aposta extraída (método flexível): {horse_name} na corrida {race} @ {odds}")
                         return BetData(
                             race=race,
                             horse_name=horse_name,
@@ -126,6 +159,38 @@ class MessageParser:
         except Exception as e:
             logger.error(f"Erro na análise flexível: {e}")
         
+        # Última tentativa: busca por qualquer número que possa ser odds e texto próximo
+        try:
+            # Busca por padrões de odds (@X.XX)
+            odds_matches = re.finditer(r'@\s*(\d+\.?\d*)', message_text)
+            for odds_match in odds_matches:
+                odds = float(odds_match.group(1))
+                # Pega o contexto antes e depois do odds
+                start_pos = max(0, odds_match.start() - 100)
+                end_pos = min(len(message_text), odds_match.end() + 100)
+                context = message_text[start_pos:end_pos]
+                
+                # Tenta identificar o nome do cavalo e da corrida no contexto
+                words = re.split(r'[\s,.]', context)
+                words = [w for w in words if len(w) > 2]  # Remove palavras muito curtas
+                
+                if len(words) >= 4:
+                    # Assume que o nome do cavalo está próximo do odds
+                    horse_name = " ".join(words[len(words)//2-2:len(words)//2])
+                    race = " ".join(words[:2])
+                    
+                    logger.info(f"Aposta extraída (método de último recurso): {horse_name} na corrida {race} @ {odds}")
+                    return BetData(
+                        race=race,
+                        horse_name=horse_name,
+                        odds=odds,
+                        raw_message=message_text,
+                        created_at=datetime.now()
+                    )
+        except Exception as e:
+            logger.error(f"Erro na análise de último recurso: {e}")
+        
+        logger.warning(f"Não foi possível extrair dados de aposta da mensagem: {message_text[:50]}...")
         return None
 
 
@@ -139,13 +204,60 @@ def is_bet_message(message_text: str) -> bool:
     Returns:
         bool: True se a mensagem parece conter uma aposta, False caso contrário.
     """
-    # Palavras-chave que indicam uma possível mensagem de aposta
-    keywords = ["aposta", "corrida", "cavalo", "odds", "stake", "bet", "race", "horse"]
+    # Normaliza o texto para facilitar a busca
+    text = message_text.lower()
+    
+    # Palavras-chave que indicam uma possível mensagem de aposta (português e inglês)
+    keywords = [
+        "aposta", "corrida", "cavalo", "odds", "stake", 
+        "bet", "race", "horse", "win", "place", "show",
+        "jockey", "hipódromo", "track", "pista", "jóquei"
+    ]
     
     # Verifica se pelo menos duas palavras-chave estão presentes
-    keyword_count = sum(1 for keyword in keywords if keyword.lower() in message_text.lower())
+    keyword_count = sum(1 for keyword in keywords if keyword in text)
     
-    # Verifica se há pelo menos um número que pode ser odds
-    has_number = bool(re.search(r"@\s*\d+\.?\d*|\d+\.?\d*\s*@|odds\s*\d+\.?\d*|\d+\.?\d*\s*odds", message_text.lower()))
+    # Padrões que indicam odds
+    odds_patterns = [
+        r'@\s*\d+\.?\d*',           # @2.5
+        r'\d+\.?\d*\s*@',           # 2.5@
+        r'odds\s*\d+\.?\d*',        # odds 2.5
+        r'\d+\.?\d*\s*odds',        # 2.5 odds
+        r'odds:\s*\d+\.?\d*',       # odds: 2.5
+        r'\(\s*\d+\.?\d*\s*\)',     # (2.5)
+        r'cotação\s*\d+\.?\d*',     # cotação 2.5
+        r'cota\s*\d+\.?\d*'         # cota 2.5
+    ]
     
-    return keyword_count >= 2 and has_number
+    # Verifica se há pelo menos um padrão de odds
+    has_odds = any(re.search(pattern, text) for pattern in odds_patterns)
+    
+    # Verifica se a mensagem tem um comprimento mínimo
+    min_length = len(text) > 10
+    
+    # Verifica se a mensagem tem um formato estruturado (linhas separadas)
+    structured_format = '\n' in message_text
+    
+    # Verifica se a mensagem contém padrões específicos de apostas
+    specific_patterns = any([
+        "corrida:" in text,
+        "cavalo:" in text,
+        "aposta:" in text,
+        "race:" in text,
+        "horse:" in text,
+        "bet:" in text
+    ])
+    
+    # Combina os critérios
+    is_bet = (
+        (keyword_count >= 2 and has_odds) or  # Critério básico
+        (keyword_count >= 1 and has_odds and specific_patterns) or  # Padrões específicos
+        (structured_format and has_odds and keyword_count >= 1)  # Formato estruturado
+    ) and min_length
+    
+    if is_bet:
+        logger.info(f"Mensagem identificada como aposta: {message_text[:50]}...")
+    else:
+        logger.debug(f"Mensagem não identificada como aposta: {message_text[:50]}...")
+    
+    return is_bet
