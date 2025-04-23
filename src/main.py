@@ -12,12 +12,12 @@ import signal
 from typing import Dict, Any, Optional
 from loguru import logger
 
-from .config.settings import get_config
-from .telegram.manager import TelegramManager, create_telegram_manager
-from .database.supabase_client import SupabaseClient
-from .database.schemas import Bet
-from .browser.manager import get_browser_manager
-from .gui.app import start_gui
+from config.settings import get_config
+from telegram.manager import TelegramManager, create_telegram_manager
+from database.supabase_client import SupabaseClient
+from database.schemas import Bet
+from browser.manager import get_browser_manager
+from gui.app import start_gui
 
 
 class Application:
